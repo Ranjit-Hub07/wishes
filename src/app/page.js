@@ -5,75 +5,79 @@ import Image from "next/image";
 import BackgroundShader from "@/components/BackgroundShader";
 import ConfettiCanvas from "@/components/ConfettiCanvas";
 import TypewriterLetter from "@/components/TypewriterLetter";
+import AudioVisualizer from "@/components/AudioVisualizer";
+import BirthdayCake from "@/components/BirthdayCake";
 
-// Web Audio API Synth to play self-contained ambient celebration music
 class AmbientSynth {
   constructor() {
-    this.ctx = null;
+    this.audio = null;
     this.isPlaying = false;
-    this.gainNode = null;
-    this.intervalId = null;
   }
 
   start() {
     if (this.isPlaying) return;
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-
-    try {
-      this.ctx = new AudioContext();
-      this.isPlaying = true;
-
-      this.gainNode = this.ctx.createGain();
-      this.gainNode.gain.setValueAtTime(0.04, this.ctx.currentTime); // Soft background level
-      this.gainNode.connect(this.ctx.destination);
-
-      // Relaxing major pentatonic scale arpeggio notes in Hz
-      const scale = [130.81, 146.83, 164.81, 196.00, 220.00, 261.63, 293.66, 329.63, 392.00, 440.00];
-
-      const playNote = () => {
-        if (!this.isPlaying || !this.ctx) return;
-        const now = this.ctx.currentTime;
-        const pitch = scale[Math.floor(Math.random() * scale.length)];
-
-        const osc = this.ctx.createOscillator();
-        const noteGain = this.ctx.createGain();
-
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(pitch, now);
-
-        // Soft arpeggiated piano-like envelop
-        noteGain.gain.setValueAtTime(0, now);
-        noteGain.gain.linearRampToValueAtTime(0.06, now + 0.1);
-        noteGain.gain.exponentialRampToValueAtTime(0.001, now + 4.0);
-
-        osc.connect(noteGain);
-        noteGain.connect(this.gainNode);
-
-        osc.start(now);
-        osc.stop(now + 4.0);
-      };
-
-      // Play notes at random intervals (arpeggio loop)
-      playNote();
-      this.intervalId = setInterval(playNote, 1200);
-    } catch (e) {
-      console.error("Web Audio API failed to initialize:", e);
+    if (typeof window !== "undefined") {
+      if (!this.audio) {
+        this.audio = new Audio("/happy-birthday.mp3");
+        this.audio.loop = true;
+        this.audio.volume = 0.45;
+      }
+      this.audio.play()
+        .then(() => {
+          this.isPlaying = true;
+        })
+        .catch((e) => {
+          console.error("Audio play failed:", e);
+        });
     }
   }
 
   stop() {
     this.isPlaying = false;
-    if (this.intervalId) {
-      clearInterval(this.intervalId);
-      this.intervalId = null;
-    }
-    if (this.ctx) {
-      this.ctx.close();
-      this.ctx = null;
+    if (this.audio) {
+      this.audio.pause();
     }
   }
 }
+
+const THEMES = {
+  cosmic: {
+    name: "Cosmic Purple",
+    class: "theme-cosmic",
+    shader: {
+      color1: [0.04, 0.02, 0.08],
+      color2: [0.18, 0.03, 0.32],
+      color3: [0.04, 0.12, 0.22]
+    }
+  },
+  sunset: {
+    name: "Sunset Gold",
+    class: "theme-sunset",
+    shader: {
+      color1: [0.12, 0.06, 0.01],
+      color2: [0.35, 0.12, 0.02],
+      color3: [0.22, 0.15, 0.02]
+    }
+  },
+  forest: {
+    name: "Forest Aurora",
+    class: "theme-forest",
+    shader: {
+      color1: [0.01, 0.06, 0.03],
+      color2: [0.02, 0.22, 0.18],
+      color3: [0.02, 0.12, 0.18]
+    }
+  },
+  rose: {
+    name: "Cyberpunk Rose",
+    class: "theme-rose",
+    shader: {
+      color1: [0.10, 0.01, 0.06],
+      color2: [0.32, 0.03, 0.22],
+      color3: [0.04, 0.18, 0.28]
+    }
+  }
+};
 
 export default function Home() {
   const [friendName, setFriendName] = useState("Denguuuuu");
@@ -81,11 +85,13 @@ export default function Home() {
   const [isMusicPlaying, setIsMusicPlaying] = useState(false);
   const [showSurpriseModal, setShowSurpriseModal] = useState(false);
   const [confettiActive, setConfettiActive] = useState(false);
-  const [shareStatus, setShareStatus] = useState("share"); // 'share' | 'copied'
   const [particles, setParticles] = useState([]);
   const [balloons, setBalloons] = useState([]);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isLoaded, setIsLoaded] = useState(false);
+
+  const selectedTheme = "cosmic";
+  const letterText = "To my best friend, another year has passed, and I'm still amazed by your light. You have this incredible ability to make even the greyest days feel like gold. Thank you for being the person who answers my 2 AM calls and for laughing at my terrible jokes. Life is so much better with you in it. Today is all about you — shine on!";
 
   const synthRef = useRef(null);
 
@@ -93,23 +99,25 @@ export default function Home() {
   useEffect(() => {
     setIsLoaded(true);
 
-    const list = Array.from({ length: 40 }).map((_, i) => ({
+    const colorClasses = ["particle-gold", "particle-pink", "particle-teal"];
+    const list = Array.from({ length: 150 }).map((_, i) => ({
       id: i,
-      size: Math.random() * 8 + 2,
+      size: Math.random() * 6 + 2,
       left: Math.random() * 100,
       top: Math.random() * 100,
-      duration: Math.random() * 10 + 10,
-      delay: Math.random() * 5,
-      opacity: Math.random() * 0.5,
+      duration: Math.random() * 12 + 8,
+      delay: Math.random() * 8,
+      opacity: Math.random() * 0.6 + 0.2,
+      colorClass: colorClasses[Math.floor(Math.random() * colorClasses.length)],
     }));
     setParticles(list);
 
     const balloonList = Array.from({ length: 40 }).map((_, i) => ({
       id: i,
       left: Math.random() * 90 + 5,
-      size: Math.random() * 20 + 20, // 20px to 40px
-      duration: Math.random() * 8 + 12, // 12s to 20s
-      delay: Math.random() * 15, // 0s to 15s delay
+      size: Math.random() * 20 + 20,
+      duration: Math.random() * 8 + 12,
+      delay: Math.random() * 15,
     }));
     setBalloons(balloonList);
 
@@ -156,16 +164,6 @@ export default function Home() {
     }
   };
 
-  const handleShare = () => {
-    if (typeof window !== "undefined") {
-      navigator.clipboard.writeText(window.location.href);
-      setShareStatus("check");
-      setTimeout(() => {
-        setShareStatus("share");
-      }, 2000);
-    }
-  };
-
   const triggerSurprise = () => {
     setShowSurpriseModal(true);
     setConfettiActive(true);
@@ -176,16 +174,60 @@ export default function Home() {
     setConfettiActive(false);
   };
 
-  // Letter contents from Stitch
-  const letterText = "To my best friend, another year has passed, and I'm still amazed by your light. You have this incredible ability to make even the greyest days feel like gold. Thank you for being the person who answers my 2 AM calls and for laughing at my terrible jokes. Life is so much better with you in it. Today is all about you — shine on!";
+  const triggerCakeBlast = () => {
+    setConfettiActive(true);
+    setTimeout(() => {
+      setConfettiActive(false);
+    }, 6000);
+  };
+
+  // Polaroid 3D hover parallax events
+  const handlePolaroidMouseMove = (e) => {
+    const card = e.currentTarget;
+    const box = card.getBoundingClientRect();
+    const x = e.clientX - box.left - box.width / 2;
+    const y = e.clientY - box.top - box.height / 2;
+    const rotX = -(y / (box.height / 2)) * 12;
+    const rotY = (x / (box.width / 2)) * 12;
+    card.style.transform = `perspective(1000px) rotateX(${rotX}deg) rotateY(${rotY}deg) scale3d(1.04, 1.04, 1.04)`;
+    card.style.boxShadow = `0 15px 35px rgba(0,0,0,0.4), 0 0 20px rgba(255,255,255,0.05)`;
+  };
+
+  const handlePolaroidMouseLeave = (e) => {
+    const card = e.currentTarget;
+    card.style.transform = `perspective(1000px) rotateX(0deg) rotateY(0deg) scale3d(1, 1, 1)`;
+    card.style.boxShadow = `none`;
+  };
 
   return (
-    <div className="relative min-h-screen">
+    <div className={`relative min-h-screen ${THEMES[selectedTheme].class} transition-colors duration-500`}>
       {/* Dynamic Ambient Background Shader */}
-      <BackgroundShader />
+      <BackgroundShader themeColors={THEMES[selectedTheme].shader} />
 
       {/* Confetti Animation Layer */}
       <ConfettiCanvas active={confettiActive} />
+
+      {/* Floating Audio Controller */}
+      <AudioVisualizer isPlaying={isMusicPlaying} onToggle={toggleMusic} />
+
+      {/* Decorative Floating Particles Sprinkle Layer */}
+      <div className="particle-container fixed inset-0 pointer-events-none z-10 overflow-hidden">
+        {particles.map((p) => (
+          <div
+            key={p.id}
+            className={`particle ${p.colorClass}`}
+            style={{
+              width: `${p.size}px`,
+              height: `${p.size}px`,
+              left: `${p.left}%`,
+              top: `${p.top}%`,
+              animationDuration: `${p.duration}s`,
+              animationDelay: `${p.delay}s`,
+              opacity: p.opacity,
+            }}
+          />
+        ))}
+      </div>
 
       {/* Floating Balloons Layer */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden z-20">
@@ -211,18 +253,17 @@ export default function Home() {
           <h1 className="font-headline-md text-headline-md font-bold text-primary cursor-pointer active:scale-95 transition-transform">
             BirthdayWish
           </h1>
-          <nav className="hidden md:flex gap-8 items-center">
+          <nav className="flex gap-4 md:gap-8 items-center">
             <a href="#memories" className="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
               Gallery
+            </a>
+            <a href="#cake-section" className="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
+              Cake
             </a>
             <a href="#timeline" className="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
               Timeline
             </a>
-            <a href="#surprise" className="font-label-md text-label-md text-on-surface-variant hover:text-primary transition-colors cursor-pointer">
-              Surprise
-            </a>
           </nav>
-
         </div>
       </header>
 
@@ -243,27 +284,10 @@ export default function Home() {
             }}
           />
 
-          {/* Decorative Floating Particles */}
-          <div className="particle-container">
-            {particles.map((p) => (
-              <div
-                key={p.id}
-                className="particle"
-                style={{
-                  width: `${p.size}px`,
-                  height: `${p.size}px`,
-                  left: `${p.left}%`,
-                  top: `${p.top}%`,
-                  animationDuration: `${p.duration}s`,
-                  animationDelay: `${p.delay}s`,
-                  opacity: p.opacity,
-                }}
-              />
-            ))}
-          </div>
+
 
           <div
-            className={`text-center space-y-stack-md relative z-20 transition-all duration-1000 ease-out`}
+            className="text-center space-y-stack-md relative z-20 transition-all duration-1000 ease-out"
             style={{
               transform: `translate3d(${mousePos.x * 20}px, ${mousePos.y * 20}px, 0)`,
               opacity: isLoaded ? 1 : 0,
@@ -338,13 +362,17 @@ export default function Home() {
         <section className="py-stack-xl max-w-container-max mx-auto px-gutter reveal-section" id="memories">
           <div className="mb-stack-lg text-center">
             <h3 className="font-headline-lg text-headline-lg mb-stack-sm">Frozen Moments</h3>
-            <div className="w-24 h-1 bg-tertiary mx-auto rounded-full"></div>
+            <div className="w-24 h-1 bg-tertiary mx-auto rounded-full text-center"></div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Polaroid 1 */}
             <div className="space-y-6">
-              <div className="group relative overflow-hidden rounded-xl glass-panel aspect-[3/4] p-4 flex flex-col justify-between floating-card-1">
-                <div className="w-full h-[85%] relative rounded-lg overflow-hidden">
+              <div
+                className="group relative overflow-hidden rounded-xl glass-panel aspect-[3/4] p-4 flex flex-col justify-between floating-card-1 transition-transform duration-200 ease-out"
+                onMouseMove={handlePolaroidMouseMove}
+                onMouseLeave={handlePolaroidMouseLeave}
+              >
+                <div className="w-full h-[85%] relative rounded-lg overflow-hidden pointer-events-none">
                   <Image
                     className="object-cover transition-transform duration-700 group-hover:scale-110"
                     src="/Images/IMG20181219122821.jpg"
@@ -362,8 +390,12 @@ export default function Home() {
 
             {/* Polaroid 2 */}
             <div className="space-y-6 md:pt-12">
-              <div className="group relative overflow-hidden rounded-xl glass-panel aspect-[3/4] p-4 flex flex-col justify-between floating-card-2">
-                <div className="w-full h-[85%] relative rounded-lg overflow-hidden">
+              <div
+                className="group relative overflow-hidden rounded-xl glass-panel aspect-[3/4] p-4 flex flex-col justify-between floating-card-2 transition-transform duration-200 ease-out"
+                onMouseMove={handlePolaroidMouseMove}
+                onMouseLeave={handlePolaroidMouseLeave}
+              >
+                <div className="w-full h-[85%] relative rounded-lg overflow-hidden pointer-events-none">
                   <Image
                     className="object-cover transition-transform duration-700 group-hover:scale-110"
                     src="/Images/IMG20181112115519.jpg"
@@ -380,8 +412,12 @@ export default function Home() {
 
             {/* Polaroid 3 */}
             <div className="space-y-6">
-              <div className="group relative overflow-hidden rounded-xl glass-panel aspect-[3/4] p-4 flex flex-col justify-between floating-card-3">
-                <div className="w-full h-[85%] relative rounded-lg overflow-hidden">
+              <div
+                className="group relative overflow-hidden rounded-xl glass-panel aspect-[3/4] p-4 flex flex-col justify-between floating-card-3 transition-transform duration-200 ease-out"
+                onMouseMove={handlePolaroidMouseMove}
+                onMouseLeave={handlePolaroidMouseLeave}
+              >
+                <div className="w-full h-[85%] relative rounded-lg overflow-hidden pointer-events-none">
                   <Image
                     className="object-cover transition-transform duration-700 group-hover:scale-110"
                     src="/Images/IMG20190627103828.jpg"
@@ -409,13 +445,25 @@ export default function Home() {
                 <TypewriterLetter text={letterText} />
               </div>
               <div className="mt-stack-md text-right">
-                <p className="font-label-caps text-label-caps text-tertiary">- Ranjit 😊</p>
+                <p className="font-label-caps text-label-caps text-tertiary">- Banty 😊</p>
               </div>
             </div>
           </div>
         </section>
 
-        {/* Section 4: Timeline */}
+
+        {/* Section 4: Interactive Birthday Cake */}
+        <section className="py-stack-xl max-w-container-max mx-auto px-gutter reveal-section" id="cake-section">
+          <div className="mb-stack-lg text-center">
+            <h3 className="font-headline-lg text-headline-lg mb-stack-sm">Make a Wish</h3>
+            <p className="font-body-md text-body-md text-on-surface-variant max-w-md mx-auto">
+              Every birthday calls for a cake! Relight and blow the candles one by one to make your secret wish come true.
+            </p>
+          </div>
+          <BirthdayCake onAllBlownOut={triggerCakeBlast} />
+        </section>
+
+        {/* Section 5: Timeline */}
         <section className="py-stack-xl max-w-container-max mx-auto px-gutter overflow-hidden" id="timeline">
           <div className="mb-stack-lg text-center">
             <h3 className="font-headline-lg text-headline-lg mb-stack-sm">Our Journey</h3>
@@ -468,7 +516,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Section 5: Surprise */}
+        {/* Section 6: Surprise */}
         <section className="py-stack-xl flex flex-col items-center justify-center bg-gradient-to-b from-transparent to-primary/10 reveal-section" id="surprise">
           <div className="text-center space-y-stack-md">
             <div className="w-20 h-20 bg-primary/20 rounded-full flex items-center justify-center mx-auto mb-stack-md animate-bounce">
@@ -486,7 +534,7 @@ export default function Home() {
           </div>
         </section>
 
-        {/* Section 6: Final Wish */}
+        {/* Section 7: Final Wish */}
         <section className="py-stack-xl min-h-[60vh] flex flex-col items-center justify-center text-center px-gutter reveal-section">
           <div className="mb-stack-lg">
             <span
@@ -508,7 +556,6 @@ export default function Home() {
       <footer className="w-full py-stack-lg bg-surface-container-lowest flex flex-col items-center justify-center gap-stack-sm relative z-10 border-t border-white/5">
         <p className="font-label-caps text-label-caps text-on-surface-variant">BirthdayWish</p>
         <p className="font-body-md text-body-md text-tertiary">Made with love</p>
-
       </footer>
 
       {/* Surprise Modal Dialog */}
